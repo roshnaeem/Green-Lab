@@ -1,0 +1,26 @@
+{
+    "id": "F5157BA5",
+    "path": "~/Desktop/VU/Green Lab/R/green-analysis/preprocessing/cleaning.R",
+    "project_path": "preprocessing/cleaning.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1697930178818.0,
+    "source_on_save": false,
+    "relative_order": 3,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "17,36",
+        "scrollLine": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1697932181,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1697932181103,
+    "read_only": false,
+    "read_only_alternatives": []
+}
