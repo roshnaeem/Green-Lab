@@ -1,12 +1,9 @@
 install.packages("pROC")
 library(pROC)
 
-## for powerjoular, 2 mins meeting should have 120 lines, and for 8 mins meeting, should have 480 lines
-## right now are 119 and 476 for 2 an d4 mins duration
-## put the mean in missing value
-
 # Create an empty data frame with the column names you need
-empty_data <- data.frame(run_id = character(), 
+empty_data <- data.frame(run_id = character(),
+                         app_type = character(),
                          microphone = character(), 
                          camera = character(), 
                          screen = character(), 
@@ -19,13 +16,15 @@ empty_data <- data.frame(run_id = character(),
                          stringsAsFactors = FALSE)
 
 # Set the path to the directory containing subdirectories
-data_folder <- "data-analysis/data/ExperimentData"
+web_folder <- "data-analysis/data/Web-data"
+electron_folder <- "data-analysis/data/Electron-data"
 
 # List all directories inside the 'data' folder
-directories <- list.dirs(path = data_folder, full.names = TRUE, recursive = FALSE)
+web_directories <- list.dirs(path = web_folder, full.names = TRUE, recursive = FALSE)
+electron_directories <- list.dirs(path = electron_folder, full.names = TRUE, recursive = FALSE)
 
-# Loop through each directory and append data to empty_data
-for (dir in directories) {
+# Loop through each web directory and append data to empty_data
+for (dir in web_directories) {
   
   base_dir <- basename(dir)
 
@@ -45,13 +44,98 @@ for (dir in directories) {
   if (length(rev_digits) >= 6) {
 
     #Extract the elements from list
-    run_id <-as.numeric(sub("Iter", "", rev_digits[6]))
+    run_id <- paste(sub("Iter", "", rev_digits[6]), "w", sep = "-")
+    app_type <- "web"
     microphone <- as.numeric(rev_digits[5])
     camera <- as.numeric(rev_digits[4])
     screen <- as.numeric(rev_digits[3])
     duration <- as.numeric(rev_digits[2])
     app <- as.numeric(rev_digits[1])
 
+    # Construct the path to the packet_counts.csv file in the current directory
+    packets_file_web <- file.path(dir, "packet_counts.csv")
+    memory_file_web <- file.path(dir, "ps.csv")
+    power_file_web <- file.path(dir, "powerjoular.csv")
+    
+    #network from packets_counts file
+    if (length(packets_file) > 0) {
+      packets_data_web <- read.csv(packets_file_web, header = TRUE, stringsAsFactors = FALSE)
+      
+      # Extract the 'total packets' column
+      total_packets_web <- as.numeric(packets_data_web$Total.Packets)
+      
+      # Add 'total packets' column to the network vector
+      network <- c(network, total_packets_web)
+      
+    }
+    if (length(memory_file) > 0) {
+      mem_data_web <- read.csv(memory_file_web, header = TRUE, stringsAsFactors = FALSE)
+      
+      mem_col_web <- mem_data_web$X.mem
+      timestamp_col_web <- mem_data_web$timestamp
+      
+      # Convert timestamp to POSIXct for proper grouping
+      timestamp_format_web <- as.POSIXct(timestamp_col_web, format="%Y-%m-%d %H:%M:%S")
+      
+      # Group mem by timestamp and create a list of mem values
+      grouped_data_web <- aggregate(mem_col_web ~ timestamp_col_web, data = mem_data_web, FUN = sum)
+      
+      # Calculate the mean of the "%mem" column, grouped by timestamp
+      mem_avg_web <- round(mean(grouped_data_web$mem_col_web, na.rm = TRUE), 5)
+
+      memory <- c(memory, mem_avg_web)
+    }
+    if (length(power_file) > 0) {
+      
+      power_data_web <- read.csv(power_file_web, header = TRUE, stringsAsFactors = FALSE)
+
+      # Calculate the sum of the "energy" column
+      energy_sum_web <- sum(power_data_web$Total.Power, na.rm = TRUE)
+      energy <- c(energy, energy_sum_web)
+      
+      # Calculate the mean of the "cpu utilization" column
+      cpu_average_web <- round(mean(power_data_web$CPU.Utilization, na.rm = TRUE), 5)
+      cpu <- c(cpu, cpu_average_web)
+    }
+    
+    # Create a data frame with the extracted digits
+    extracted_data <- data.frame(run_id, app_type, microphone, camera, screen, duration, app, network, memory, energy, cpu, stringsAsFactors = FALSE)
+    
+    # Append the extracted data to the empty_data data frame
+    empty_data <- rbind(empty_data, extracted_data)
+
+  }
+}
+
+# Loop through each web directory and append data to empty_data
+for (dir in electron_directories) {
+  
+  base_dir <- basename(dir)
+  
+  # Split the string based on underscores and convert to numeric
+  split_values <- unlist(strsplit(base_dir, "_"))
+  
+  # Convert the split values to a list and reverse them
+  rev_digits <- rev(as.list(split_values))
+  
+  # Reset vector for each directory
+  network <- character()
+  memory <- character()
+  energy <- character()
+  cpu <- character()
+  
+  # Check if there are at least 6 digits in the directory name
+  if (length(rev_digits) >= 6) {
+    
+    #Extract the elements from list
+    run_id <- paste(sub("Iter", "", rev_digits[6]), "e", sep = "-")
+    app_type <- "electron"
+    microphone <- as.numeric(rev_digits[5])
+    camera <- as.numeric(rev_digits[4])
+    screen <- as.numeric(rev_digits[3])
+    duration <- as.numeric(rev_digits[2])
+    app <- as.numeric(rev_digits[1])
+    
     # Construct the path to the packet_counts.csv file in the current directory
     packets_file <- file.path(dir, "packet_counts.csv")
     memory_file <- file.path(dir, "ps.csv")
@@ -62,7 +146,7 @@ for (dir in directories) {
       packets_data <- read.csv(packets_file, header = TRUE, stringsAsFactors = FALSE)
       
       # Extract the 'total packets' column
-      total_packets <- packets_data$Total.Packets
+      total_packets <- as.numeric(packets_data$Total.Packets)
       
       # Add 'total packets' column to the network vector
       network <- c(network, total_packets)
@@ -82,20 +166,13 @@ for (dir in directories) {
       
       # Calculate the mean of the "%mem" column, grouped by timestamp
       mem_avg <- round(mean(grouped_data$mem_col, na.rm = TRUE), 5)
-
+      
       memory <- c(memory, mem_avg)
+
     }
     if (length(power_file) > 0) {
       
       power_data <- read.csv(power_file, header = TRUE, stringsAsFactors = FALSE)
-      
-      # # Convert Date column to proper date-time format
-      # power_data$Date <- as.POSIXct(power_data$Date, format = "%Y-%m-%d %H:%M:%S")
-      # 
-      # # Calculate AUC for Total Power over time
-      # roc_curve <- roc(power_data$Date, power_data$Total.Power)
-      # auc_value <- auc(roc_curve)
-      # print(auc_value)
       
       # Calculate the sum of the "energy" column
       energy_sum <- sum(power_data$Total.Power, na.rm = TRUE)
@@ -107,13 +184,23 @@ for (dir in directories) {
     }
     
     # Create a data frame with the extracted digits
-    extracted_data <- data.frame(run_id, microphone, camera, screen, duration, app, network, memory, energy, cpu, stringsAsFactors = FALSE)
+    extracted_data <- data.frame(run_id, app_type, microphone, camera, screen, duration, app, network, memory, energy, cpu, stringsAsFactors = FALSE)
     
     # Append the extracted data to the empty_data data frame
     empty_data <- rbind(empty_data, extracted_data)
-
+    
   }
 }
+
+
+print(class(data_file$run_id))
+
+# Update the specific column based on run_id
+empty_data <- empty_data %>%
+  mutate(app = ifelse(run_id == "93-w", 3, app)) %>%
+  mutate(app = ifelse(run_id == "92-e", 3, app)) %>%
+  mutate(app = ifelse(run_id == "60-e", 2, app))
+
 
 # Write the appended data to the existing CSV file
 write.csv(empty_data, file = "data-analysis/data.csv", row.names = FALSE, quote = FALSE)
